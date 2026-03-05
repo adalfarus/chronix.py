@@ -218,4 +218,5 @@ chmod +x ./aps_build_master.sh
 
 ## License
 
-chronix is licensed under the LGPL-2.1 License - see the [LICENSE](https://github.com/adalfarus/chronix/blob/main/LICENSE) file for details.
+chronix is licensed under the LGPL-3.0 License - see the [LICENSE](https://github.com/adalfarus/chronix/blob/main/LICENSE) file for details.
+
