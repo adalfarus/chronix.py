@@ -45,142 +45,170 @@ If you have problems with the package please use `py -m pip install chronix[cli,
 
 ## 📦 Usage
 
-Here are a few quick examples of how to use `chronix`.
+The examples below use the public API exactly as implemented in this repository.
 
----
-
-## ⏱ Basic Timing (`chronix`)
-
-Measure elapsed time with nanosecond resolution.
-
----
-
-### ⏲ Use `BasicTimer` for simple measurements
+### Basic elapsed time (`BasicTimer`)
 
 ```python
-from chronix import BasicTimer
 import time
+from chronix import BasicTimer
 
 timer = BasicTimer(auto_start=True)
-time.sleep(0.123)
+time.sleep(0.2)
 timer.stop()
 
-print(timer.get())          # timedelta
-print(timer.get_readable()) # Human-readable
+print(timer.get())            # datetime.timedelta(...)
+print(timer.get_readable())   # "0.2 seconds, ..."
 ```
 
----
-
-### 📏 Create precise deltas
+### Split/lap-like checkpoints with averages (`BasicTimer`)
 
 ```python
-from chronix import PreciseTimeDelta
+import time
+from chronix import BasicTimer
 
-delta = PreciseTimeDelta(seconds=1.5, microseconds=250)
-print(str(delta))           # 0:00:01.500250
-print(delta.to_readable())  # "1.500s"
+timer = BasicTimer().start()
+time.sleep(0.05)
+timer.split_start()  # start -> now
+time.sleep(0.08)
+timer.split_end()    # last stop/start -> now
+
+print(timer.get_times())  # [(start, split1), (split1, split2)]
+print(timer.tally())      # total seconds as float
+print(timer.average())    # average segment as timedelta
 ```
 
----
-
-## ⏱ Flexible Timing with `FlexTimer`
-
-Advanced control for performance tracking, interval measurements, and benchmarking.
-
----
-
-### 🧪 Measure CPU-only time (ignores sleep)
+### Precise delta parsing and formatting (`PreciseTimeDelta`)
 
 ```python
-from chronix import CPUFTimer
+from chronix import PreciseTimeDelta, PreciseTimeFormat
 
-with CPUFTimer():
-    sum(i * i for i in range(100_000))
+delta = PreciseTimeDelta.parse_timedelta_string("01:02:03.4")
+print(delta.nanoseconds())                      # 3723400000000.0
+print(delta.to_readable(PreciseTimeFormat.SECONDS))
+print(delta.to_clock_string())                  # clock-style representation
 ```
 
-> Ideal for benchmarking with minimal system interference.
-
----
-
-### 🔄 Manual start/stop and waiting
+### Flexible timer with explicit start/stop (`FlexTimer`)
 
 ```python
 from chronix import FlexTimer
 
 t = FlexTimer(start_now=False)
-t.start(start_at=1.2)
-t.wait(0.8)
+t.start(start_at=1.25)  # pre-load elapsed time
+t.wait(0.2)
+t.lap()                 # record a lap
 t.stop()
 
-print(t.get().to_clock_string())  # e.g., 00:00:02.00
+print(t.get().to_readable())
+print(t.show_laps())
 ```
 
----
-
-### ⏱ Record laps (interval checkpoints)
+### Track multiple timers by index (`FlexTimer`)
 
 ```python
-t = FlexTimer()
-# ... task 1 ...
-t.lap()
-# ... task 2 ...
-t.lap()
-
-print(t.show_laps())  # List of lap durations
-```
-
----
-
-### 🪄 Time entire functions with a decorator
-
-```python
-@FlexTimer().time()
-def compute():
-    return [x**2 for x in range(1_000_000)]
-
-compute()  # Prints execution time
-```
-
----
-
-### 🕒 Schedule callbacks after a delay
-
-```python
-def on_done():
-    print("Finished!")
-
-FlexTimer().after(2, on_done)
-```
-
----
-
-### 🧵 Run functions at intervals
-
-```python
-def tick():
-    print("Tick!")
-
-FlexTimer().interval(1, count=5, callback=tick)
-```
-
----
-
-### 📈 Estimate time complexity of a function
-
-```python
-def fn(n):
-    return [i ** 2 for i in range(n)]
-
-def gen_inputs():
-    for i in range(1000, 50000, 1000):
-        yield ((i,), {})
-
 from chronix import FlexTimer
-print(FlexTimer.complexity(fn, gen_inputs()))  # e.g., "O(N)"
+
+t = FlexTimer(start_now=False)
+t.start(0, 1)            # start two independent timers
+t.wait_ms(20)
+t.stop(0)
+t.wait_ms(10)
+t.stop(1)
+
+print(t.get(0).to_readable())  # shorter
+print(t.get(1).to_readable())  # longer
 ```
 
-### chrono cli
-Can currently run tests with ```chrono tests run tests/ -minimal``` and show a basic help using ```chrono help```.
+### Decorator timing for functions
+
+```python
+from chronix import FlexTimer
+
+@FlexTimer.time()
+def build_values(n: int) -> list[int]:
+    return [i * i for i in range(n)]
+
+build_values(100_000)
+```
+
+### Context manager timing for code blocks
+
+```python
+from chronix import CPUFTimer
+
+with CPUFTimer():
+    sum(i * i for i in range(200_000))
+```
+
+`CPUFTimer` uses process CPU time, so sleep/wait time is mostly excluded.
+
+### Schedule delayed and repeated callbacks
+
+```python
+from chronix import FlexTimer
+
+timer = FlexTimer(start_now=False)
+
+timer.after(1.0, print, args=("one-shot fired",))
+timer.interval(0.5, 3, print, args=("interval fired",))
+timer.schedule_task_at("23:59", print, args=("scheduled for clock time",))
+```
+
+### Long-running loop you can stop manually
+
+```python
+from chronix import FlexTimer
+
+timer = FlexTimer(start_now=False)
+timer.interval(0.25, "inf", print, args=("tick",))
+
+# ... later
+timer.stop_loops(0)
+```
+
+### Estimate time complexity of a function
+
+```python
+from chronix import FlexTimer
+
+def work(n: int) -> int:
+    return sum(range(n))
+
+def inputs():
+    for n in range(1_000, 20_000, 1_000):
+        yield ((n,), {})
+
+print(FlexTimer.complexity(work, inputs()))  # e.g. "O(N)"
+```
+
+`FlexTimer.complexity` requires optional dependencies: `numpy`, `scipy`, and `scikit-learn`.
+
+### CLI examples
+
+Install CLI extras if needed:
+
+```sh
+pip install "chronix[cli]"
+```
+
+Show help:
+
+```sh
+chronix help
+```
+
+Run all tests from the CLI:
+
+```sh
+chronix tests run
+```
+
+Run selected tests in minimal mode:
+
+```sh
+chronix tests run tests -minimal
+```
 
 For more detailed usage and examples, check out our [documentation](https://github.com/adalfarus/chronix/wiki).
 
