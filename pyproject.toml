@@ -27,7 +27,7 @@ exclude = [
 
 [project]
 name = "chronix"
-version = "2.0.0.5"
+version = "2.0.0.6"
 dependencies = ["typing_extensions"]
 requires-python = ">= 3.10"
 authors = [
@@ -36,7 +36,7 @@ authors = [
 maintainers = [
   {name = "Cariel Becker", email = "cariel.becker@gmx.de"},
 ]
-description = "A small timer utility that has all the helpful features you could ever want!"
+description = "Every concept timer you've ever seen, rolled into one. It has all the helpful features you could ever want."
 readme = {file = "README.md", content-type = "text/markdown"}
 license = "LGPL-2.1-or-later"
 keywords = ["general", "tools", "app tools", "production", "apt"]
